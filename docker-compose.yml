@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: frontend-innovatech:latest
+    container_name: frontend-app
+    ports:
+      - "80:80"
+    restart: unless-stopped
