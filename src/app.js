@@ -1,5 +1,4 @@
-const BACKEND_URL = 'http://10.0.2.212:8080';
-
+const BACKEND_URL = 'http://18.234.50.30';
 async function checkBackend() {
     const statusDiv = document.getElementById('api-status');
     try {
