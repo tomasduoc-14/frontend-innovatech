@@ -1,4 +1,4 @@
-name: CI/CD Frontend Innovatech
+name: CI/CD Frontend Innovatech ECS
 
 on:
   push:
@@ -6,46 +6,40 @@ on:
       - deploy
 
 jobs:
-  build:
-    name: Build y Push imagen
+  deploy:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout codigo
+      - name: Checkout código
         uses: actions/checkout@v4
 
-      - name: Login Docker Hub
-        uses: docker/login-action@v3
+      - name: Configurar credenciales AWS
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: us-east-1
 
-      - name: Build y Push
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/frontend-innovatech:latest
+      - name: Login a Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
 
-  deploy:
-    name: Deploy en EC2 Frontend
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.0.0
-        with:
-          host: ${{ secrets.EC2_FRONTEND_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
-            docker stop frontend-app || true
-            docker rm frontend-app || true
-            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/frontend-innovatech:latest
-            docker run -d \
-              --name frontend-app \
-              --restart unless-stopped \
-              -p 80:80 \
-              ${{ secrets.DOCKERHUB_USERNAME }}/frontend-innovatech:latest
-            docker ps | grep frontend-app
-            echo "✅ Frontend desplegado OK"
+      - name: Build Docker image
+        run: |
+          docker build -t frontend-innovatech .
+
+      - name: Tag Docker image
+        run: |
+          docker tag frontend-innovatech:latest 159773920634.dkr.ecr.us-east-1.amazonaws.com/frontend-innovatech:latest
+
+      - name: Push image to ECR
+        run: |
+          docker push 159773920634.dkr.ecr.us-east-1.amazonaws.com/frontend-innovatech:latest
+
+      - name: Actualizar ECS
+        run: |
+          aws ecs update-service \
+            --cluster innovatech-cluster \
+            --service frontend-service \
+            --force-new-deployment
